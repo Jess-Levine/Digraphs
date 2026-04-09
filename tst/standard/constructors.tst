@@ -8,7 +8,8 @@
 #############################################################################
 ##
 
-#@local adj, bddigraph, bdgroup, ddigraph, digraph, gr, gr2, gr3, group, n, out
+#@local adj, bddigraph, bdgroup, ddigraph, digraph, gr, gr2, gr3, group, n, out, D, BN, m1
+#@local m2, m3, m
 gap> START_TEST("Digraphs package: standard/constructors.tst");
 gap> LoadPackage("digraphs", false);;
 
@@ -177,6 +178,25 @@ gap> gr := ChainDigraph(4);
 <immutable chain digraph with 4 vertices>
 gap> LineUndirectedDigraph(gr);
 Error, the argument <D> must be a symmetric digraph,
+
+# Bayesian Networks
+gap> D := Digraph([[2],[3],[]]);
+<immutable digraph with 3 vertices, 2 edges>
+gap> m1 := [[0.2,0.8]];
+[ [ 0.2, 0.8 ] ]
+gap> m2 := [[0.1,0.9],[0.7,0.3]];
+[ [ 0.1, 0.9 ], [ 0.7, 0.3 ] ]
+gap> m3 := [[0.6,0.4],[0.3,0.7]];
+[ [ 0.6, 0.4 ], [ 0.3, 0.7 ] ]
+gap> m := [m1, m2, m3];
+[ [ [ 0.2, 0.8 ] ], [ [ 0.1, 0.9 ], [ 0.7, 0.3 ] ], 
+  [ [ 0.6, 0.4 ], [ 0.3, 0.7 ] ] ]
+gap> BN := BayesianNetwork(D, m);
+<immutable acyclic digraph with 3 vertices, 2 edges>
+gap> BeliefPropagation(BN, 1, [[3, true]]);
+[ 0.139241, 0.860759 ]
+gap> BeliefPropagation(BN, 3, []);
+[ 0.474, 0.526 ]
 
 #
 gap> DIGRAPHS_StopTest();

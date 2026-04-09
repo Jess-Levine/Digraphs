@@ -175,3 +175,123 @@ function(D)
                  OnSets,
                  {x, y} -> x <> y and not IsEmpty(Intersection(x, y)));
 end);
+
+
+InstallMethod(BayesianNetwork, "for a digraph and a list of CPT matrices", [IsDigraph, IsList],
+function(D, CPT) 
+  if not DigraphNrVertices(D) = Length(CPT) then
+    ErrorNoReturn("length of probability list must be equal to number of vertices");
+  # Need to change this to check BN is polytree (the underlying undirected graph is acylic)
+  elif not IsAcyclicDigraph(D) then
+    ErrorNoReturn("Digraph must be Acylic");
+  fi;
+  # Check that every row of all CPTs sum to 1
+
+  # Check that every CPT for node n has dimension: 2 x 2 ^ {size(InNeighbours(D)[n]))
+
+  # Set the label of every node as the CPT matrix
+  SetDigraphVertexLabels(D, CPT);
+  return D;
+end);
+
+InstallMethod(BeliefPropagation, "for a BN, target vertexInt and list of evidence",[IsDigraph, IsInt, IsList],
+function(BN, X, e)
+  local priors, likelihoods, unnormalized, sum, 
+  initialise_likelihood_and_prior, get_likelihood, get_prior,
+  message_to_parent, message_to_child;
+
+  initialise_likelihood_and_prior := function(e)
+    local i, n, pair, evidence_lookup;
+
+    n := DigraphNrVertices(BN);
+    priors := List([1..n], i -> fail);
+    likelihoods := List([1..n], i -> fail);
+
+    # used to determine for every node, if it is observed and if it is stores it's value
+    evidence_lookup := List([1..n], i -> fail);
+
+    for pair in e do
+      evidence_lookup[pair[1]] := pair[2];
+    od;
+
+    for i in [1..n] do
+      if evidence_lookup[i] <> fail then
+        if evidence_lookup[i] = true then
+          priors[i] := [1,0];
+          likelihoods[i] := [1,0];
+        else
+          priors[i] := [0,1];
+          likelihoods[i] := [0,1];
+        fi;
+      # check if root node (no parents) or leaf node (no children)
+      elif Length(InNeighbours(BN)[i]) = 0 then
+        priors[i] := DigraphVertexLabel(BN,i)[1];
+
+      elif Length(OutNeighbours(BN)[i]) = 0 then
+        likelihoods[i] := [1, 1];
+      fi;
+    od;
+  end;
+
+  get_likelihood := function(X)
+    local messages, c;
+    if likelihoods[X] <> fail then
+      return likelihoods[X];
+    fi;
+
+    messages := [];
+    
+    for c in OutNeighbours(BN)[X] do
+      Add(messages, message_to_parent(c, X));
+    od;
+    likelihoods[X] := [Product(TransposedMat(messages)[1]), Product(TransposedMat(messages)[2])];
+    return likelihoods[X];
+  end;
+
+  get_prior := function(X)
+    local messages, p;
+    if priors[X] <> fail then
+      return priors[X];
+    fi;
+    messages := [];
+    for p in InNeighbours(BN)[X] do
+      Add(messages, message_to_child(p, X));
+    od;
+    # update this line later to combine multiple pi messages in
+    priors[X] := messages[1];
+    return priors[X];
+  end;
+
+  message_to_parent := function(child, parent)
+    local likelihood_child, likelihood_parent;
+    likelihood_child := get_likelihood(child);
+    # performs matrix multiplication of CPT and column vector λ
+    likelihood_parent := List(DigraphVertexLabel(BN,child), row -> row * likelihood_child);
+    return likelihood_parent;
+  end;
+
+  message_to_child := function(parent, child)
+    local prior_parent, prior_child, CPT;
+    prior_parent := get_prior(parent);
+    CPT := DigraphVertexLabel(BN,child);
+    # performs matrix multiplication of row vector pi and CPT
+    prior_child := List(TransposedMat(CPT), col -> prior_parent * col);
+    return prior_child;
+  end;
+
+  initialise_likelihood_and_prior(e);
+
+  unnormalized := List([1..2], i -> get_prior(X)[i] * get_likelihood(X)[i]);  
+  
+  sum := Sum(unnormalized);
+
+  # Print("Priors: ",priors, "\n");
+  # Print("Likelihoods: ",likelihoods);
+
+  return List(unnormalized, x -> x/sum);
+end);
+
+InstallMethod(GetCPT, "for a BN and vertexInt", [IsDigraph, IsInt],
+function(BN, n)
+  return DigraphVertexLabel(BN,n);
+end);
