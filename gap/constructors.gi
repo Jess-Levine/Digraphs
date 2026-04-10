@@ -196,24 +196,27 @@ end);
 
 InstallMethod(BeliefPropagation, "for a BN, target vertexInt and list of evidence",[IsDigraph, IsInt, IsList],
 function(BN, X, e)
-  local priors, likelihoods, unnormalized, sum, 
-  initialise_likelihood_and_prior, get_likelihood, get_prior,
+  local priors, likelihoods,
+  initialise_likelihood_and_prior, 
+  get_belief, get_likelihood, get_prior,
   message_to_parent, message_to_child;
 
   initialise_likelihood_and_prior := function(e)
     local i, n, pair, evidence_lookup;
 
     n := DigraphNrVertices(BN);
+
+    # instatiate empty lists of priors and likelihoods with length equal to number of vertexes
     priors := List([1..n], i -> fail);
     likelihoods := List([1..n], i -> fail);
 
-    # used to determine for every node, if it is observed and if it is stores it's value
+    # for every node, determine if it is observed, and if it is store it's value
     evidence_lookup := List([1..n], i -> fail);
-
     for pair in e do
       evidence_lookup[pair[1]] := pair[2];
     od;
 
+    # For every node; if it is an evidence, root or leaf node, it gets an inital value of priors and likelihoods
     for i in [1..n] do
       if evidence_lookup[i] <> fail then
         if evidence_lookup[i] = true then
@@ -233,62 +236,145 @@ function(BN, X, e)
     od;
   end;
 
+  get_belief := function(X, e)
+    local prior, likelihood, unnormalized, sum;
+    initialise_likelihood_and_prior(e);
+
+    likelihood := get_likelihood(X);
+    prior := get_prior(X);
+
+    # vector multiplication π * λ
+    unnormalized := List([1..2], i -> prior[i] * likelihood[i]);  
+
+    sum := Sum(unnormalized);
+
+    # normalize probability to return
+    return List(unnormalized, x -> x/sum);
+  end;
+
   get_likelihood := function(X)
     local messages, c;
+
+    # check if likelihood is known
     if likelihoods[X] <> fail then
       return likelihoods[X];
     fi;
 
+    # if not, collect all incoming messages from children
     messages := [];
-    
     for c in OutNeighbours(BN)[X] do
       Add(messages, message_to_parent(c, X));
     od;
+
+    # take the product of all incoming messages 
     likelihoods[X] := [Product(TransposedMat(messages)[1]), Product(TransposedMat(messages)[2])];
     return likelihoods[X];
   end;
 
   get_prior := function(X)
-    local messages, p;
+    local messages, p, CPT, k, combination_index, product_messages, value;
+
+    # check if prior is known
     if priors[X] <> fail then
       return priors[X];
     fi;
+
+    # if it's not, collect all incoming messages from parents
     messages := [];
     for p in InNeighbours(BN)[X] do
       Add(messages, message_to_child(p, X));
     od;
-    # update this line later to combine multiple pi messages in
-    priors[X] := messages[1];
+
+    CPT := DigraphVertexLabel(BN,X);
+    # k is number of parents
+    k := Length(InNeighbours(BN)[X]);
+    priors[X] := [0,0];
+
+    for combination_index in [0..2^k-1] do
+      product_messages := 1;
+      for p in [1..k] do
+        # gets 1 for true parent values and 2 for false parent values
+        value := ((QuoInt(combination_index, 2^(k-p))) mod 2) + 1;
+        product_messages := product_messages * messages[p][value];
+      od;
+      priors[X] := [priors[X][1] + (CPT[combination_index + 1][1] * product_messages),  priors[X][2] + (CPT[combination_index + 1][2] * product_messages)];
+    od;
     return priors[X];
   end;
 
   message_to_parent := function(child, parent)
-    local likelihood_child, likelihood_parent;
-    likelihood_child := get_likelihood(child);
-    # performs matrix multiplication of CPT and column vector λ
-    likelihood_parent := List(DigraphVertexLabel(BN,child), row -> row * likelihood_child);
-    return likelihood_parent;
+    local likelihood, CPT, messages, parent_list, k, p, out_message, parent_val, combination_index, product_messages, skip, msg_index, value, total, x;
+
+    likelihood := get_likelihood(child);
+    CPT := DigraphVertexLabel(BN, child);
+
+    parent_list := InNeighbours(BN)[child];
+    k := Length(parent_list);
+
+    # get messages from all other parents of the child
+    messages := [];
+    for p in parent_list do
+      if p <> parent then
+        Add(messages, message_to_child(p, child));
+      fi;
+    od;
+
+    out_message := [0,0];
+
+    # compute the cases for parent = true and parent = false separately
+    for parent_val in [1,2] do
+      total := 0;
+      # iterate over combinations of all parent values
+      for combination_index in [0..(2^k)-1] do
+        product_messages := 1;
+        skip := false;
+        msg_index := 1;
+
+        # iterate over all parents of child
+        for p in [1..k] do 
+          value := ((QuoInt(combination_index, 2^(k-p))) mod 2) + 1;
+          if parent_list[p] = parent then
+            if value <> parent_val then
+              skip := true;
+              break;
+            fi;
+          else 
+            product_messages := product_messages * messages[msg_index][value];
+            msg_index := msg_index + 1;
+          fi;
+        od;
+
+        if skip = false then
+          # iterate over values of the child
+          for x in [1,2] do
+            total := total + (likelihood[x] * CPT[combination_index+1][x] * product_messages);
+          od;
+        fi;
+      od;
+      out_message[parent_val] := total;
+    od;
+
+    return out_message;
   end;
 
   message_to_child := function(parent, child)
-    local prior_parent, prior_child, CPT;
-    prior_parent := get_prior(parent);
-    CPT := DigraphVertexLabel(BN,child);
-    # performs matrix multiplication of row vector pi and CPT
-    prior_child := List(TransposedMat(CPT), col -> prior_parent * col);
-    return prior_child;
+    local prior, messages, c, msg;
+    prior := get_prior(parent);
+
+    messages := [];
+    for c in OutNeighbours(BN)[parent] do
+      if c <> child then
+        Add(messages, message_to_parent(c, parent));
+      fi;
+    od;
+
+    for msg in messages do
+      prior := [prior[1] * msg[1], prior[2] * msg[2]];
+    od;
+    return prior;
   end;
 
-  initialise_likelihood_and_prior(e);
-
-  unnormalized := List([1..2], i -> get_prior(X)[i] * get_likelihood(X)[i]);  
-  
-  sum := Sum(unnormalized);
-
-  # Print("Priors: ",priors, "\n");
-  # Print("Likelihoods: ",likelihoods);
-
-  return List(unnormalized, x -> x/sum);
+  return get_belief(X, e);
 end);
 
 InstallMethod(GetCPT, "for a BN and vertexInt", [IsDigraph, IsInt],
