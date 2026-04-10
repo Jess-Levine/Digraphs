@@ -219,10 +219,11 @@ function(D, CPT)
 
   # Set the label of every node as the CPT matrix
   SetDigraphVertexLabels(D, CPT);
+  SetFilterObj(D, IsBayesianNetwork);
   return D;
 end);
 
-InstallMethod(BeliefPropagation, "for a BN, target vertexInt and list of evidence",[IsDigraph, IsInt, IsList],
+InstallMethod(BeliefPropagation, "for a BN, target vertexInt and list of evidence",[IsBayesianNetwork, IsInt, IsList],
 function(BN, X, e)
   local priors, likelihoods,
   initialise_likelihood_and_prior, 
@@ -405,7 +406,7 @@ function(BN, X, e)
   return get_belief(X, e);
 end);
 
-InstallMethod(GetCPT, "for a BN and vertexInt", [IsDigraph, IsInt],
+InstallMethod(GetCPT, "for a BN and vertexInt", [IsBayesianNetwork, IsInt],
 function(BN, n)
   return DigraphVertexLabel(BN,n);
 end);

@@ -22,6 +22,7 @@ DeclareSynonym("EdgeDigraph", LineDigraph);
 DeclareOperation("LineUndirectedDigraph", [IsDigraph]);
 DeclareSynonym("EdgeUndirectedDigraph", LineUndirectedDigraph);
 
+DeclareCategory("IsBayesianNetwork", IsDigraph);
 DeclareOperation("BayesianNetwork", [IsDigraph, IsList]);
 DeclareOperation("BeliefPropagation", [IsDigraph, IsInt, IsList]);
 DeclareOperation("GetCPT", [IsDigraph, IsInt]);
