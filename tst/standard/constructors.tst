@@ -180,6 +180,24 @@ gap> LineUndirectedDigraph(gr);
 Error, the argument <D> must be a symmetric digraph,
 
 # Bayesian Networks
+gap> D := Digraph([[2,3],[],[]]);
+<immutable digraph with 3 vertices, 2 edges>
+gap> m1 := [[0.5,0.5]];
+[ [ 0.5, 0.5 ] ]
+gap> m2 := [[0.2,0.8],[0.6,0.4]];
+[ [ 0.2, 0.8 ], [ 0.6, 0.4 ] ]
+gap> m3 := [[0,1],[0.5,0.5]];
+[ [ 0, 1 ], [ 0.5, 0.5 ] ]
+gap> m := [m1, m2, m3];
+[ [ [ 0.5, 0.5 ] ], [ [ 0.2, 0.8 ], [ 0.6, 0.4 ] ], 
+  [ [ 0, 1 ], [ 0.5, 0.5 ] ] ]
+gap> BN := BayesianNetwork(D, m);
+Error, CPT for vertex 3, row 1 has non float value
+gap> m := [m1, m2];
+[ [ [ 0.5, 0.5 ] ], [ [ 0.2, 0.8 ], [ 0.6, 0.4 ] ] ]
+gap> BN := BayesianNetwork(D, m);
+Error, length of CPT list must be equal to number of vertices
+
 gap> D := Digraph([[2],[3],[]]);
 <immutable digraph with 3 vertices, 2 edges>
 gap> m1 := [[0.2,0.8]];
@@ -192,7 +210,7 @@ gap> m := [m1, m2, m3];
 [ [ [ 0.2, 0.8 ] ], [ [ 0.1, 0.9 ], [ 0.7, 0.3 ] ], 
   [ [ 0.6, 0.4 ], [ 0.3, 0.7 ] ] ]
 gap> BN := BayesianNetwork(D, m);
-<immutable acyclic digraph with 3 vertices, 2 edges>
+<immutable connected acyclic digraph with 3 vertices, 2 edges>
 gap> BeliefPropagation(BN, 1, [[3, true]]);
 [ 0.139241, 0.860759 ]
 gap> BeliefPropagation(BN, 3, []);

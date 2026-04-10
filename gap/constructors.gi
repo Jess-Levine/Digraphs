@@ -178,16 +178,44 @@ end);
 
 
 InstallMethod(BayesianNetwork, "for a digraph and a list of CPT matrices", [IsDigraph, IsList],
-function(D, CPT) 
-  if not DigraphNrVertices(D) = Length(CPT) then
-    ErrorNoReturn("length of probability list must be equal to number of vertices");
-  # Need to change this to check BN is polytree (the underlying undirected graph is acylic)
-  elif not IsAcyclicDigraph(D) then
-    ErrorNoReturn("Digraph must be Acylic");
-  fi;
-  # Check that every row of all CPTs sum to 1
+function(D, CPT)
+  local IsPolytree, n, r;
 
-  # Check that every CPT for node n has dimension: 2 x 2 ^ {size(InNeighbours(D)[n]))
+  IsPolytree := function(D)
+    return IsAcyclicDigraph(D)
+      and IsConnectedDigraph(D)
+      and (DigraphNrEdges(D) = DigraphNrVertices(D) - 1);
+  end;
+
+  if not DigraphNrVertices(D) = Length(CPT) then
+    ErrorNoReturn("length of CPT list must be equal to number of vertices\n");
+  # Need to change this to check BN is polytree (the underlying undirected graph is acylic)
+  elif not IsPolytree(D) then
+    ErrorNoReturn("Digraph must be a poytree\n");
+  fi;
+
+  # check the attributes of every CPT matrix
+  for n in [1..Length(CPT)] do
+
+    for r in [1..Length(CPT[n])] do
+      if not (IsFloat(CPT[n][r][1]) and IsFloat(CPT[n][r][2])) then
+        ErrorNoReturn("CPT for vertex ", n, ", row ", r, " has non float value\n");
+      elif (Sum(CPT[n][r]) <> 1.) then
+        ErrorNoReturn("CPT for vertex ", n, ", row ", r," does not sum to 1\n");
+      fi;
+    od;
+    
+    if not IsMatrix(CPT[n]) then
+      ErrorNoReturn("CPT for vertex ", n, "must be a matrix\n");
+    elif not IsRectangularTable(CPT[n]) then
+      ErrorNoReturn("CPT for vertex ", n, "is not rectagular\n");
+    elif DimensionsMat(CPT[n])[2] <> 2 then
+      ErrorNoReturn("CPT for vertex ", n, "does not have 2 columns\n");
+    elif DimensionsMat(CPT[n])[1] <> 2 ^ Length(InNeighbours(D)[n]) then
+      ErrorNoReturn("CPT for vertex ", n, "does not have (2 ^ number of parents of ", n,") rows\n");
+    fi;
+    
+  od;
 
   # Set the label of every node as the CPT matrix
   SetDigraphVertexLabels(D, CPT);
