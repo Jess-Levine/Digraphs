@@ -687,7 +687,7 @@ function(D)
 
   if IsMultiDigraph(D) then
     Append(str, "multi");
-  fi;B
+  fi;
 
   if IsBayesianNetwork(D) then
     Append(str, "bayesian ");
